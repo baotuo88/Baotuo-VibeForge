@@ -173,7 +173,7 @@ pnpm db:migrate
 pnpm dev
 
 # 3. 访问
-http://localhost:3000/dashboard
+http://localhost:3008/dashboard
 
 # 4. 创建项目
 点击"创建新项目" → 输入想法 → 开始对话

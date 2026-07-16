@@ -33,7 +33,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-访问 http://localhost:3000
+访问 http://localhost:3008
 
 ### 3. Docker 部署（推荐）
 
