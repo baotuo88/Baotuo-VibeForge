@@ -1,0 +1,475 @@
+// Baotuo-VibeForge Database Schema
+// AI Software Architect + Vibe Coding Prompt Factory
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// User & Authentication
+// ============================================================================
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum PlanType {
+  FREE
+  PRO
+  TEAM
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String?
+  avatar        String?
+  role          UserRole  @default(USER)
+  plan          PlanType  @default(FREE)
+  planExpiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  projects      Project[]
+  conversations Conversation[]
+  providers     AIProvider[]
+  teamMembers   TeamMember[]
+  ownedTeams    Team[]        @relation("TeamOwner")
+
+  @@index([email])
+  @@map("users")
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  ownerId     String
+  plan        PlanType @default(TEAM)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  owner       User         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     TeamMember[]
+  projects    Project[]
+  providers   AIProvider[]
+
+  @@index([slug])
+  @@index([ownerId])
+  @@map("teams")
+}
+
+enum TeamRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model TeamMember {
+  id     String   @id @default(cuid())
+  teamId String
+  userId String
+  role   TeamRole @default(MEMBER)
+
+  joinedAt DateTime @default(now())
+
+  // Relations
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+  @@map("team_members")
+}
+
+// ============================================================================
+// AI Provider & Model Management
+// ============================================================================
+
+enum ProviderType {
+  OPENAI
+  ANTHROPIC
+  GOOGLE
+  DEEPSEEK
+  MOONSHOT
+  ZHIPU
+  OPENROUTER
+  CUSTOM
+}
+
+model AIProvider {
+  id          String       @id @default(cuid())
+  name        String
+  type        ProviderType
+  baseUrl     String?
+  apiKey      String // encrypted
+  isActive    Boolean      @default(true)
+
+  // Ownership
+  userId      String?
+  teamId      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  models Model[]
+
+  @@index([userId])
+  @@index([teamId])
+  @@index([type])
+  @@map("ai_providers")
+}
+
+model Model {
+  id          String @id @default(cuid())
+  providerId  String
+  name        String // e.g., "gpt-4", "claude-sonnet-4.5"
+  displayName String // e.g., "GPT-4"
+
+  // Model capabilities
+  contextWindow     Int?
+  maxOutputTokens   Int?
+  supportsFunctions Boolean @default(false)
+  supportsVision    Boolean @default(false)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  provider AIProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  agents   Agent[]
+
+  @@unique([providerId, name])
+  @@index([providerId])
+  @@index([isActive])
+  @@map("models")
+}
+
+// ============================================================================
+// Agent System
+// ============================================================================
+
+enum AgentType {
+  SUPERVISOR      // Orchestrates other agents
+  PRODUCT_MANAGER // Generates PRD
+  UI_UX_DESIGNER  // UI/UX design suggestions
+  ARCHITECT       // Technical architecture
+  DATABASE        // Database design
+  PROMPT          // Prompt generation
+}
+
+model Agent {
+  id           String    @id @default(cuid())
+  name         String
+  type         AgentType
+  systemPrompt String    @db.Text
+  description  String?   @db.Text
+
+  // Model binding
+  modelId String
+
+  // Agent configuration
+  temperature Float   @default(0.7)
+  maxTokens   Int     @default(4000)
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  model            Model              @relation(fields: [modelId], references: [id])
+  conversationLogs ConversationLog[]
+
+  @@index([type])
+  @@index([modelId])
+  @@index([isActive])
+  @@map("agents")
+}
+
+// ============================================================================
+// Project & Workspace
+// ============================================================================
+
+enum ProjectStatus {
+  DRAFT
+  REQUIREMENT_ANALYSIS
+  DESIGN
+  ARCHITECTURE
+  READY
+  IN_DEVELOPMENT
+  COMPLETED
+  ARCHIVED
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  description String?       @db.Text
+  status      ProjectStatus @default(DRAFT)
+
+  // Initial user idea
+  initialIdea String? @db.Text
+
+  // Ownership
+  userId String
+  teamId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team          Team?          @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+  documents     Document[]
+  prompts       GeneratedPrompt[]
+  uploads       Upload[]
+
+  @@index([userId])
+  @@index([teamId])
+  @@index([status])
+  @@map("projects")
+}
+
+// ============================================================================
+// Conversation & Messages
+// ============================================================================
+
+enum ConversationMode {
+  NORMAL       // Simple mode: one-shot analysis
+  PROFESSIONAL // Professional mode: multi-step workflow
+}
+
+model Conversation {
+  id        String           @id @default(cuid())
+  projectId String
+  userId    String
+  mode      ConversationMode @default(NORMAL)
+  title     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  project Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs    ConversationLog[]
+
+  @@index([projectId])
+  @@index([userId])
+  @@map("conversations")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model ConversationLog {
+  id             String   @id @default(cuid())
+  conversationId String
+  agentId        String?
+  role           MessageRole
+  content        String   @db.Text
+
+  // Metadata
+  metadata Json? // Store token usage, latency, etc.
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  agent        Agent?       @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId])
+  @@index([agentId])
+  @@index([createdAt])
+  @@map("conversation_logs")
+}
+
+// ============================================================================
+// Generated Documents
+// ============================================================================
+
+enum DocumentType {
+  PRD          // Product Requirements Document
+  ARCHITECTURE // Technical Architecture
+  DATABASE     // Database Design
+  API_SPEC     // API Specification
+  UI_DESIGN    // UI/UX Design
+  OTHER
+}
+
+model Document {
+  id        String       @id @default(cuid())
+  projectId String
+  type      DocumentType
+  title     String
+  content   String       @db.Text
+  version   Int          @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([type])
+  @@map("documents")
+}
+
+// ============================================================================
+// Prompt Generation
+// ============================================================================
+
+enum DevelopmentTool {
+  CLAUDE_CODE
+  CODEX
+  CURSOR
+  WINDSURF
+  CLINE
+  CONTINUE
+  AIDER
+  LOVABLE
+  BOLT
+  REPLIT_AGENT
+  CUSTOM
+}
+
+model GeneratedPrompt {
+  id        String          @id @default(cuid())
+  projectId String
+  tool      DevelopmentTool
+  title     String
+  content   String          @db.Text
+  version   Int             @default(1)
+
+  // Metadata
+  metadata Json? // Store generation params, settings
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([tool])
+  @@map("generated_prompts")
+}
+
+// ============================================================================
+// Template System
+// ============================================================================
+
+enum TemplateCategory {
+  SAAS
+  ECOMMERCE
+  AI_APPLICATION
+  BLOG
+  PORTFOLIO
+  CUSTOM
+}
+
+model Template {
+  id          String           @id @default(cuid())
+  name        String
+  description String           @db.Text
+  category    TemplateCategory
+
+  // Template content
+  features      String[] // Array of feature descriptions
+  techStack     Json     // { frontend: [], backend: [], database: [] }
+  databaseSchema String?  @db.Text
+  architecture   String?  @db.Text
+
+  isPublic Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([isPublic])
+  @@map("templates")
+}
+
+// ============================================================================
+// Knowledge Base
+// ============================================================================
+
+enum UploadType {
+  PDF
+  WORD
+  MARKDOWN
+  IMAGE
+  ZIP
+  GITHUB_REPO
+  FIGMA_LINK
+  OTHER
+}
+
+model Upload {
+  id        String     @id @default(cuid())
+  projectId String
+  type      UploadType
+  fileName  String
+  fileUrl   String
+  fileSize  Int?
+
+  // Extracted content for RAG
+  extractedText String? @db.Text
+
+  // Metadata
+  metadata Json? // Store github url, figma url, etc.
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([type])
+  @@map("uploads")
+}
+
+// ============================================================================
+// Usage & Billing
+// ============================================================================
+
+model Usage {
+  id     String   @id @default(cuid())
+  userId String
+  date   DateTime @default(now()) @db.Date
+
+  // Usage metrics
+  projectsCreated Int @default(0)
+  tokensUsed      Int @default(0)
+  promptsGenerated Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+  @@map("usage")
+}
