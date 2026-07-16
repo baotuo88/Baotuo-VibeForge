@@ -1,4 +1,4 @@
-import { StateGraph, END } from "@langchain/langgraph"
+import { StateGraph, END } from "@langchain/langgraph/web"
 import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages"
 import { llmService } from "@/lib/services/llm.service"
 import { AGENT_PROMPTS } from "./prompts"
