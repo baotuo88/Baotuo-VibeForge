@@ -1,44 +1,104 @@
+import Link from "next/link"
+import { AppShell, PageHeader } from "@/components/app-shell"
+import { Plus, Sparkles, Server, Bot, FolderKanban } from "lucide-react"
+
+const QUICK_LINKS = [
+  {
+    href: "/projects/new",
+    icon: Plus,
+    title: "创建新项目",
+    desc: "从一个想法开始，AI 帮你规划一切",
+    color: "sky",
+  },
+  {
+    href: "/settings/providers",
+    icon: Server,
+    title: "配置 AI Provider",
+    desc: "接入 OpenAI / Anthropic / 自定义 API",
+    color: "indigo",
+  },
+  {
+    href: "/settings/agents",
+    icon: Bot,
+    title: "调整 Agent",
+    desc: "编辑各阶段 Agent 的 System Prompt",
+    color: "emerald",
+  },
+  {
+    href: "/projects",
+    icon: FolderKanban,
+    title: "查看项目列表",
+    desc: "回到你的项目工作区",
+    color: "amber",
+  },
+]
+
+const COLORS: Record<string, string> = {
+  sky: "bg-sky-500/10 text-sky-400",
+  indigo: "bg-indigo-500/10 text-indigo-400",
+  emerald: "bg-emerald-500/10 text-emerald-400",
+  amber: "bg-amber-500/10 text-amber-400",
+}
+
 export default function DashboardPage() {
   return (
-    <div className="flex h-screen bg-[#0B0E14]">
-      <div className="flex-1 flex flex-col">
-        <header className="border-b border-slate-800 bg-[#0F172A] px-6 py-4">
-          <h1 className="text-xl font-semibold text-slate-50">Baotuo-VibeForge</h1>
-          <p className="text-sm text-slate-400 mt-1">AI 软件架构师 + Vibe Coding Prompt 工厂</p>
-        </header>
-
-        <main className="flex-1 p-6">
-          <div className="max-w-4xl mx-auto">
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-slate-50 mb-2">开始你的项目</h2>
-              <p className="text-slate-400">描述你的想法，AI 将帮你完成产品设计和技术规划</p>
+    <AppShell>
+      <PageHeader
+        title="工作台"
+        description="AI 软件架构师 + Vibe Coding Prompt 工厂"
+      />
+      <div className="p-8">
+        <div className="max-w-5xl mx-auto">
+          <div className="mb-8 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-sky-500 to-indigo-500 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-white" />
             </div>
-
-            <div className="bg-[#1E293B] rounded-lg border border-slate-700 p-6 mb-6">
-              <h3 className="text-lg font-medium text-slate-50 mb-4">快速开始</h3>
-              <div className="space-y-3">
-                <a href="/projects/new" className="block p-4 bg-[#0F172A] hover:bg-[#1E293B] border border-slate-700 rounded-lg transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-sky-500/10 flex items-center justify-center">
-                      <svg className="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div className="font-medium text-slate-50">创建新项目</div>
-                      <div className="text-sm text-slate-400">从一个想法开始，AI 帮你规划一切</div>
-                    </div>
-                  </div>
-                </a>
-              </div>
-            </div>
-
-            <div className="text-center text-slate-500 text-sm">
-              尚未配置 AI Provider？<a href="/settings/providers" className="text-sky-400 hover:underline ml-1">前往设置</a>
+            <div>
+              <h2 className="text-2xl font-bold text-slate-50">开始你的项目</h2>
+              <p className="text-slate-400 text-sm">
+                描述你的想法，AI 将帮你完成 PRD、架构和 Prompt 生成
+              </p>
             </div>
           </div>
-        </main>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {QUICK_LINKS.map((item) => {
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="group block p-5 bg-[#1E293B] hover:bg-[#243244] border border-slate-700 hover:border-slate-600 rounded-lg transition-colors"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${COLORS[item.color]}`}>
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-slate-50 group-hover:text-white">
+                        {item.title}
+                      </div>
+                      <div className="text-sm text-slate-400 mt-1">
+                        {item.desc}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+
+          <div className="mt-8 p-5 bg-[#1E293B]/50 border border-slate-800 rounded-lg text-sm text-slate-400">
+            <div className="font-medium text-slate-300 mb-2">首次使用？</div>
+            <ol className="list-decimal list-inside space-y-1">
+              <li>先在 <Link href="/settings/providers" className="text-sky-400 hover:underline">AI Providers</Link> 添加至少一个 API Key</li>
+              <li>在 <Link href="/settings/models" className="text-sky-400 hover:underline">模型管理</Link> 拉取可用模型</li>
+              <li>在 <Link href="/settings/agents" className="text-sky-400 hover:underline">Agent 配置</Link> 给每个 Agent 绑定模型</li>
+              <li>回到工作台 <Link href="/projects/new" className="text-sky-400 hover:underline">创建项目</Link></li>
+            </ol>
+          </div>
+        </div>
       </div>
-    </div>
+    </AppShell>
   )
 }
