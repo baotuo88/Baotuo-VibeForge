@@ -89,4 +89,84 @@ Prompt 应包含：
 - 验收标准
 
 输出格式：根据目标工具调整`,
+
+  UI_UX_DESIGNER: `你是资深 UI/UX 设计师 Agent。
+
+职责：
+1. 根据 PRD 提出界面与交互设计建议
+2. 定义信息架构与页面结构
+3. 给出设计系统建议（配色、排版、组件）
+
+设计文档应包含：
+- 用户体验流程
+- 页面结构与信息架构
+- 关键界面描述
+- 设计系统建议（配色/字体/间距/组件）
+- 可访问性(A11y)考虑
+
+输出格式：Markdown`,
 }
+
+/**
+ * 默认 Agent 定义 — 供 seed 脚本与"一键初始化 Agent"功能复用。
+ * type 与 AgentType 一一对应；systemPrompt 复用上面的 AGENT_PROMPTS。
+ */
+export interface DefaultAgentDef {
+  name: string
+  type: keyof typeof AGENT_PROMPTS
+  description: string
+  systemPrompt: string
+  temperature: number
+  maxTokens: number
+}
+
+export const DEFAULT_AGENTS: DefaultAgentDef[] = [
+  {
+    name: "Supervisor 编排器",
+    type: "SUPERVISOR",
+    description: "协调各 Agent，按工作流推进项目规划",
+    systemPrompt: AGENT_PROMPTS.SUPERVISOR,
+    temperature: 0.3,
+    maxTokens: 2000,
+  },
+  {
+    name: "产品经理",
+    type: "PRODUCT_MANAGER",
+    description: "分析需求并生成 PRD 文档",
+    systemPrompt: AGENT_PROMPTS.PRODUCT_MANAGER,
+    temperature: 0.7,
+    maxTokens: 4000,
+  },
+  {
+    name: "UI/UX 设计师",
+    type: "UI_UX_DESIGNER",
+    description: "提出界面与交互设计建议",
+    systemPrompt: AGENT_PROMPTS.UI_UX_DESIGNER,
+    temperature: 0.7,
+    maxTokens: 4000,
+  },
+  {
+    name: "技术架构师",
+    type: "ARCHITECT",
+    description: "设计技术架构与技术栈选型",
+    systemPrompt: AGENT_PROMPTS.ARCHITECT,
+    temperature: 0.5,
+    maxTokens: 4000,
+  },
+  {
+    name: "数据库设计师",
+    type: "DATABASE",
+    description: "设计数据库结构与 Prisma Schema",
+    systemPrompt: AGENT_PROMPTS.DATABASE,
+    temperature: 0.4,
+    maxTokens: 4000,
+  },
+  {
+    name: "Prompt 生成器",
+    type: "PROMPT",
+    description: "为各开发工具生成开发 Prompt",
+    systemPrompt: AGENT_PROMPTS.PROMPT,
+    temperature: 0.6,
+    maxTokens: 4000,
+  },
+]

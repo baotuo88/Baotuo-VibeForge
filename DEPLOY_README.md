@@ -291,81 +291,35 @@ NODE_ENV="production"
 PORT="3008"
 ```
 
-### 5. 修改 docker-compose.yml（生产配置）
+### 5. 生产 Compose 已内置
 
-创建 `docker-compose.prod.yml`：
+仓库已包含 `docker-compose.prod.yml`（应用 + PostgreSQL + Redis 一体化）和多阶段构建的 `Dockerfile`，无需手写。服务名为 `app`、`postgres`、`redis`，应用容器启动时会自动执行数据库迁移（见 `docker-entrypoint.sh`：有迁移文件用 `prisma migrate deploy`，无则回退 `prisma db push`）。
 
-```yaml
-version: '3.8'
-
-services:
-  web:
-    build: .
-    ports:
-      - "3008:3008"
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
-      - NEXTAUTH_URL=${NEXTAUTH_URL}
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-    depends_on:
-      - postgres
-      - redis
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: vibeforge
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-
-  minio:
-    image: minio/minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    volumes:
-      - minio_data:/data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    restart: unless-stopped
-
-volumes:
-  postgres_data:
-  redis_data:
-  minio_data:
-```
+生产环境所需的变量（`POSTGRES_PASSWORD`、`NEXTAUTH_URL`、`NEXTAUTH_SECRET`、`ENCRYPTION_KEY` 等）从 `.env` 注入，数据库和 Redis 的连接串已在 compose 内按服务名配置好。
 
 ### 6. 构建和启动
 
 ```bash
-# 构建镜像
-docker-compose -f docker-compose.prod.yml build
-
-# 启动所有服务
-docker-compose -f docker-compose.prod.yml up -d
+# 构建并启动所有服务（首次会自动建表）
+docker compose -f docker-compose.prod.yml up -d --build
 
 # 查看日志
-docker-compose -f docker-compose.prod.yml logs -f
+docker compose -f docker-compose.prod.yml logs -f app
 ```
 
-### 7. 运行数据库迁移
+### 7. 数据库迁移（自动）
+
+应用容器每次启动都会自动同步数据库结构，无需手动执行。如需手动触发：
 
 ```bash
-docker-compose -f docker-compose.prod.yml exec web pnpm db:migrate
+docker compose -f docker-compose.prod.yml exec app ./node_modules/.bin/prisma migrate deploy
+```
+
+如需创建初始管理员账号：
+
+```bash
+docker compose -f docker-compose.prod.yml exec app node -e "require('tsx/cjs')" 2>/dev/null; \
+docker compose -f docker-compose.prod.yml exec -e SEED_ADMIN_EMAIL=admin@example.com -e SEED_ADMIN_PASSWORD=你的密码 app ./node_modules/.bin/prisma db seed
 ```
 
 ### 8. 配置 Nginx 反向代理（可选）

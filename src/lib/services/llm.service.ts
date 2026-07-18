@@ -5,9 +5,12 @@ import { decrypt } from "@/lib/crypto"
 import type { AgentType } from "@/types/agent"
 
 export class LLMService {
-  async getChatModel(agentType: AgentType) {
-    // Get agent configuration
-    const agent = await prisma.agent.findFirst({
+  /**
+   * Load the active agent config for a given type (includes model + provider).
+   * Returns null if none configured.
+   */
+  async getAgentConfig(agentType: AgentType) {
+    return prisma.agent.findFirst({
       where: {
         type: agentType,
         isActive: true,
@@ -20,9 +23,16 @@ export class LLMService {
         },
       },
     })
+  }
+
+  async getChatModel(agentType: AgentType) {
+    // Get agent configuration
+    const agent = await this.getAgentConfig(agentType)
 
     if (!agent) {
-      throw new Error(`No active agent found for type: ${agentType}`)
+      throw new Error(
+        `未找到已启用的「${agentType}」Agent，请在后台「Agent 配置」中创建或点击一键初始化`
+      )
     }
 
     const provider = agent.model.provider
@@ -61,6 +71,15 @@ export class LLMService {
     const model = await this.getChatModel(agentType)
     const response = await model.invoke(messages)
     return response.content
+  }
+
+  /**
+   * Resolve the system prompt for an agent type: prefer the DB-configured
+   * `systemPrompt`, fall back to the provided default (static AGENT_PROMPTS).
+   */
+  async resolveSystemPrompt(agentType: AgentType, fallback: string): Promise<string> {
+    const agent = await this.getAgentConfig(agentType)
+    return agent?.systemPrompt?.trim() ? agent.systemPrompt : fallback
   }
 }
 

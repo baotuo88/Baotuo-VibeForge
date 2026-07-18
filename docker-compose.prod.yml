@@ -1,0 +1,69 @@
+# ============================================================================
+# Baotuo-VibeForge 生产 Compose：应用 + PostgreSQL + Redis 一体化部署
+#
+# 用法：
+#   1. 复制 .env.example 为 .env 并填写生产配置（尤其 NEXTAUTH_SECRET / ENCRYPTION_KEY）
+#   2. docker compose -f docker-compose.prod.yml up -d --build
+#   3. 访问 http://<服务器IP>:3008
+#
+# 应用容器启动时会自动执行 prisma migrate deploy（见 docker-entrypoint.sh）
+# ============================================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vibeforge-app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3008}:3008"
+    environment:
+      # 容器内通过服务名访问数据库和 Redis
+      DATABASE_URL: "postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-vibeforge}?schema=public"
+      REDIS_URL: "redis://redis:6379"
+      NODE_ENV: production
+      PORT: 3008
+      # 以下从 .env 注入
+      NEXTAUTH_URL: "${NEXTAUTH_URL}"
+      NEXTAUTH_SECRET: "${NEXTAUTH_SECRET}"
+      ENCRYPTION_KEY: "${ENCRYPTION_KEY}"
+      SEED_ADMIN_EMAIL: "${SEED_ADMIN_EMAIL:-}"
+      SEED_ADMIN_PASSWORD: "${SEED_ADMIN_PASSWORD:-}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: vibeforge-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-password}"
+      POSTGRES_DB: "${POSTGRES_DB:-vibeforge}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: vibeforge-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:

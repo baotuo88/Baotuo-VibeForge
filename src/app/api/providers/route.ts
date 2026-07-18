@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { providerService } from "@/lib/services/provider.service"
+import { requireUser } from "@/lib/session"
 
 // GET /api/providers - List all providers
 export async function GET(req: NextRequest) {
-  try {
-    // TODO: Get userId from session
-    const userId = "temp-user-id" // Replace with actual session
+  const user = await requireUser()
+  if (user instanceof NextResponse) return user
 
-    const providers = await providerService.listProviders(userId)
+  try {
+    const providers = await providerService.listProviders(user.id)
 
     // Don't expose decrypted API keys in list
     const sanitized = providers.map((p) => ({
@@ -27,10 +28,10 @@ export async function GET(req: NextRequest) {
 
 // POST /api/providers - Create new provider
 export async function POST(req: NextRequest) {
-  try {
-    // TODO: Get userId from session
-    const userId = "temp-user-id" // Replace with actual session
+  const user = await requireUser()
+  if (user instanceof NextResponse) return user
 
+  try {
     const body = await req.json()
     const { name, type, baseUrl, apiKey } = body
 
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
       type,
       baseUrl,
       apiKey,
-      userId,
+      userId: user.id,
     })
 
     return NextResponse.json({

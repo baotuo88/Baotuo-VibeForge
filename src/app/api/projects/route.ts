@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { requireUser } from "@/lib/session"
 
 // POST /api/projects - Create new project
 export async function POST(req: NextRequest) {
   try {
-    // TODO: Get userId from session
-    const userId = "temp-user-id"
+    const user = await requireUser()
+    if (user instanceof NextResponse) return user
 
     const body = await req.json()
     const { name, initialIdea, mode = "NORMAL" } = body
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
       data: {
         name,
         initialIdea,
-        userId,
+        userId: user.id,
         status: "REQUIREMENT_ANALYSIS",
       },
     })
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
     await prisma.conversation.create({
       data: {
         projectId: project.id,
-        userId,
+        userId: user.id,
         mode,
         title: name,
       },
@@ -49,11 +50,11 @@ export async function POST(req: NextRequest) {
 // GET /api/projects - List projects
 export async function GET(req: NextRequest) {
   try {
-    // TODO: Get userId from session
-    const userId = "temp-user-id"
+    const user = await requireUser()
+    if (user instanceof NextResponse) return user
 
     const projects = await prisma.project.findMany({
-      where: { userId },
+      where: { userId: user.id },
       orderBy: { updatedAt: "desc" },
       include: {
         _count: {

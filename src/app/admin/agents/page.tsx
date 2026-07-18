@@ -44,6 +44,7 @@ export default function AgentsSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Agent | null>(null)
+  const [initializing, setInitializing] = useState(false)
 
   const [form, setForm] = useState({
     name: "",
@@ -137,19 +138,53 @@ export default function AgentsSettingsPage() {
     if (res.ok) await loadAgents()
   }
 
+  async function handleInit() {
+    if (models.length === 0) {
+      alert("尚未发现任何模型，请先在 Providers 页面添加并同步模型")
+      return
+    }
+    if (!confirm("将为缺失的 Agent 类型创建默认配置，并绑定到一个可用模型。继续？"))
+      return
+    setInitializing(true)
+    try {
+      const res = await fetch("/api/agents/init", { method: "POST" })
+      const data = await res.json()
+      if (res.ok) {
+        alert(data.message || `已初始化 ${data.created ?? 0} 个默认 Agent`)
+        await loadAgents()
+      } else {
+        alert(data.error || "初始化失败")
+      }
+    } catch (e) {
+      alert("请求失败")
+    } finally {
+      setInitializing(false)
+    }
+  }
+
   return (
     <AppShell>
       <PageHeader
         title="Agent 配置"
         description="管理各类 Agent 的系统提示词、绑定模型与运行参数"
         actions={
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 rounded-md text-sm font-medium transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            新建 Agent
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleInit}
+              disabled={initializing}
+              className="flex items-center gap-2 px-4 py-2 border border-slate-700 hover:bg-slate-800 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              <Sparkles className={`w-4 h-4 ${initializing ? "animate-pulse" : ""}`} />
+              {initializing ? "初始化中..." : "一键初始化"}
+            </button>
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 rounded-md text-sm font-medium transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              新建 Agent
+            </button>
+          </div>
         }
       />
 
@@ -163,13 +198,23 @@ export default function AgentsSettingsPage() {
             <div className="text-slate-500 text-sm mb-4">
               为每个环节（PRD、架构、数据库、Prompt）配置专用 Agent
             </div>
-            <button
-              onClick={openCreate}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 rounded-md text-sm font-medium transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              新建第一个 Agent
-            </button>
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={handleInit}
+                disabled={initializing}
+                className="inline-flex items-center gap-2 px-4 py-2 border border-slate-700 hover:bg-slate-800 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                <Sparkles className={`w-4 h-4 ${initializing ? "animate-pulse" : ""}`} />
+                {initializing ? "初始化中..." : "一键初始化默认 Agent"}
+              </button>
+              <button
+                onClick={openCreate}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 rounded-md text-sm font-medium transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                手动新建
+              </button>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

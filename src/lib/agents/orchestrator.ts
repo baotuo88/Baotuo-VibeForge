@@ -80,8 +80,9 @@ class AgentOrchestrator {
   }
 
   private async supervisorNode(state: AgentState): Promise<Partial<AgentState>> {
+    const systemPrompt = await llmService.resolveSystemPrompt("SUPERVISOR", AGENT_PROMPTS.SUPERVISOR)
     const messages = [
-      new SystemMessage(AGENT_PROMPTS.SUPERVISOR),
+      new SystemMessage(systemPrompt),
       ...state.messages.map((m) =>
         m.role === "user" ? new HumanMessage(m.content) : new AIMessage(m.content)
       ),
@@ -96,8 +97,9 @@ class AgentOrchestrator {
   }
 
   private async productManagerNode(state: AgentState): Promise<Partial<AgentState>> {
+    const systemPrompt = await llmService.resolveSystemPrompt("PRODUCT_MANAGER", AGENT_PROMPTS.PRODUCT_MANAGER)
     const messages = [
-      new SystemMessage(AGENT_PROMPTS.PRODUCT_MANAGER),
+      new SystemMessage(systemPrompt),
       ...state.messages.map((m) =>
         m.role === "user" ? new HumanMessage(m.content) : new AIMessage(m.content)
       ),
@@ -114,9 +116,10 @@ class AgentOrchestrator {
 
   private async architectNode(state: AgentState): Promise<Partial<AgentState>> {
     const context = state.prd ? `\n\n参考 PRD：\n${state.prd}` : ""
+    const systemPrompt = await llmService.resolveSystemPrompt("ARCHITECT", AGENT_PROMPTS.ARCHITECT)
 
     const messages = [
-      new SystemMessage(AGENT_PROMPTS.ARCHITECT + context),
+      new SystemMessage(systemPrompt + context),
       ...state.messages.map((m) =>
         m.role === "user" ? new HumanMessage(m.content) : new AIMessage(m.content)
       ),
@@ -136,9 +139,10 @@ class AgentOrchestrator {
 ${state.prd ? `\n参考 PRD：\n${state.prd}` : ""}
 ${state.architecture ? `\n参考架构：\n${state.architecture}` : ""}
 `
+    const systemPrompt = await llmService.resolveSystemPrompt("DATABASE", AGENT_PROMPTS.DATABASE)
 
     const messages = [
-      new SystemMessage(AGENT_PROMPTS.DATABASE + context),
+      new SystemMessage(systemPrompt + context),
       ...state.messages.map((m) =>
         m.role === "user" ? new HumanMessage(m.content) : new AIMessage(m.content)
       ),
@@ -159,9 +163,10 @@ ${state.prd ? `\n参考 PRD：\n${state.prd}` : ""}
 ${state.architecture ? `\n参考架构：\n${state.architecture}` : ""}
 ${state.databaseDesign ? `\n参考数据库设计：\n${state.databaseDesign}` : ""}
 `
+    const systemPrompt = await llmService.resolveSystemPrompt("PROMPT", AGENT_PROMPTS.PROMPT)
 
     const messages = [
-      new SystemMessage(AGENT_PROMPTS.PROMPT + context),
+      new SystemMessage(systemPrompt + context),
       ...state.messages.map((m) =>
         m.role === "user" ? new HumanMessage(m.content) : new AIMessage(m.content)
       ),

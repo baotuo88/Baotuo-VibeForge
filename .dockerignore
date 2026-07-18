@@ -1,0 +1,47 @@
+# 依赖与构建产物
+node_modules
+.next
+out
+build
+dist
+
+# 环境变量（运行时注入，切勿打进镜像）
+.env
+.env.local
+.env*.local
+.env.production
+
+# 版本控制与 IDE
+.git
+.gitignore
+.idea
+.vscode
+*.swp
+*.swo
+
+# 文档（不影响运行）
+*.md
+!README.md
+
+# 测试与覆盖率
+coverage
+.vitest
+
+# 日志与临时文件
+*.log
+npm-debug.log*
+pnpm-debug.log*
+uploads
+temp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker 自身
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# 其他脚本
+git-push.bat

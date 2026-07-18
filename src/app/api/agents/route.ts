@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { requireUser, requireAdmin } from "@/lib/session"
 
-// GET /api/agents - List all agents
+// GET /api/agents - List all agents (any authenticated user)
 export async function GET(_req: NextRequest) {
+  const user = await requireUser()
+  if (user instanceof NextResponse) return user
+
   try {
     const agents = await prisma.agent.findMany({
       include: {
@@ -26,8 +30,11 @@ export async function GET(_req: NextRequest) {
   }
 }
 
-// POST /api/agents - Create new agent
+// POST /api/agents - Create new agent (admin only)
 export async function POST(req: NextRequest) {
+  const admin = await requireAdmin()
+  if (admin instanceof NextResponse) return admin
+
   try {
     const body = await req.json()
     const { name, type, systemPrompt, description, modelId, temperature, maxTokens } = body

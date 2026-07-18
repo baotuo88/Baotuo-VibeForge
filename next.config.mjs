@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // 生产 Docker 部署使用 standalone 输出，产物更小、启动更快
+  output: 'standalone',
   experimental: {
     serverActions: {
       bodySizeLimit: '10mb',

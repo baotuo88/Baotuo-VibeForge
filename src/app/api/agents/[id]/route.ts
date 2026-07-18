@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { requireUser, requireAdmin } from "@/lib/session"
 
-// GET /api/agents/[id]
+// GET /api/agents/[id] - Any authenticated user can read
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const user = await requireUser()
+    if (user instanceof NextResponse) return user
+
     const agent = await prisma.agent.findUnique({
       where: { id: params.id },
       include: {
@@ -25,12 +29,15 @@ export async function GET(
   }
 }
 
-// PATCH /api/agents/[id]
+// PATCH /api/agents/[id] - Admin only
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const admin = await requireAdmin()
+    if (admin instanceof NextResponse) return admin
+
     const body = await req.json()
     const agent = await prisma.agent.update({
       where: { id: params.id },
@@ -48,12 +55,15 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/agents/[id]
+// DELETE /api/agents/[id] - Admin only
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const admin = await requireAdmin()
+    if (admin instanceof NextResponse) return admin
+
     await prisma.agent.delete({ where: { id: params.id } })
     return NextResponse.json({ success: true })
   } catch (error) {
