@@ -43,13 +43,9 @@ export class ProviderService {
   }
 
   async listProviders(userId: string) {
+    // 只返回当前用户拥有的 Provider（团队共享逻辑待团队功能实现后再按 teamId 精确匹配）
     return await prisma.aIProvider.findMany({
-      where: {
-        OR: [
-          { userId },
-          { teamId: { not: null } }, // Team providers
-        ],
-      },
+      where: { userId },
       include: {
         models: true,
       },
@@ -57,6 +53,18 @@ export class ProviderService {
         createdAt: "desc",
       },
     })
+  }
+
+  /**
+   * 返回 Provider 的归属 userId（不解密 apiKey，用于鉴权校验）。
+   * 找不到返回 null。
+   */
+  async getProviderOwner(id: string): Promise<string | null> {
+    const provider = await prisma.aIProvider.findUnique({
+      where: { id },
+      select: { userId: true },
+    })
+    return provider?.userId ?? null
   }
 
   async updateProvider(
