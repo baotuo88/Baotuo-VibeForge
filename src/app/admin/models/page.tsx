@@ -116,7 +116,7 @@ export default function ModelsPage() {
             <Cpu className="w-12 h-12 text-slate-600 mx-auto mb-3" />
             <p className="text-slate-400 mb-4">还没有配置 AI Provider</p>
             <a
-              href="/settings/providers"
+              href="/admin/providers"
               className="inline-block px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-600 text-sm"
             >
               前往添加 Provider

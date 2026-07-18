@@ -22,10 +22,10 @@ interface NavItem {
 const NAV: NavItem[] = [
   { label: "工作台", href: "/dashboard", icon: LayoutDashboard, section: "主导航" },
   { label: "项目列表", href: "/projects", icon: FolderKanban, section: "主导航" },
-  { label: "AI Providers", href: "/settings/providers", icon: Server, section: "后台管理" },
-  { label: "模型管理", href: "/settings/models", icon: Cpu, section: "后台管理" },
-  { label: "Agent 配置", href: "/settings/agents", icon: Bot, section: "后台管理" },
-  { label: "系统设置", href: "/settings", icon: SettingsIcon, section: "后台管理" },
+  { label: "AI Providers", href: "/admin/providers", icon: Server, section: "后台管理" },
+  { label: "模型管理", href: "/admin/models", icon: Cpu, section: "后台管理" },
+  { label: "Agent 配置", href: "/admin/agents", icon: Bot, section: "后台管理" },
+  { label: "系统设置", href: "/admin", icon: SettingsIcon, section: "后台管理" },
 ]
 
 export function AppShell({ children }: { children: React.ReactNode }) {

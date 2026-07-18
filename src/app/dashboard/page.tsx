@@ -11,14 +11,14 @@ const QUICK_LINKS = [
     color: "sky",
   },
   {
-    href: "/settings/providers",
+    href: "/admin/providers",
     icon: Server,
     title: "配置 AI Provider",
     desc: "接入 OpenAI / Anthropic / 自定义 API",
     color: "indigo",
   },
   {
-    href: "/settings/agents",
+    href: "/admin/agents",
     icon: Bot,
     title: "调整 Agent",
     desc: "编辑各阶段 Agent 的 System Prompt",
@@ -91,9 +91,9 @@ export default function DashboardPage() {
           <div className="mt-8 p-5 bg-[#1E293B]/50 border border-slate-800 rounded-lg text-sm text-slate-400">
             <div className="font-medium text-slate-300 mb-2">首次使用？</div>
             <ol className="list-decimal list-inside space-y-1">
-              <li>先在 <Link href="/settings/providers" className="text-sky-400 hover:underline">AI Providers</Link> 添加至少一个 API Key</li>
-              <li>在 <Link href="/settings/models" className="text-sky-400 hover:underline">模型管理</Link> 拉取可用模型</li>
-              <li>在 <Link href="/settings/agents" className="text-sky-400 hover:underline">Agent 配置</Link> 给每个 Agent 绑定模型</li>
+              <li>先在 <Link href="/admin/providers" className="text-sky-400 hover:underline">AI Providers</Link> 添加至少一个 API Key</li>
+              <li>在 <Link href="/admin/models" className="text-sky-400 hover:underline">模型管理</Link> 拉取可用模型</li>
+              <li>在 <Link href="/admin/agents" className="text-sky-400 hover:underline">Agent 配置</Link> 给每个 Agent 绑定模型</li>
               <li>回到工作台 <Link href="/projects/new" className="text-sky-400 hover:underline">创建项目</Link></li>
             </ol>
           </div>

@@ -6,42 +6,42 @@ import { Server, Cpu, Bot, KeyRound, Database, Shield } from "lucide-react"
 
 const CARDS = [
   {
-    href: "/settings/providers",
+    href: "/admin/providers",
     icon: Server,
     title: "AI Providers",
     desc: "配置 OpenAI、Anthropic、DeepSeek 等 AI 服务商",
     color: "sky",
   },
   {
-    href: "/settings/models",
+    href: "/admin/models",
     icon: Cpu,
     title: "模型管理",
     desc: "查看和管理已发现的 AI 模型",
     color: "violet",
   },
   {
-    href: "/settings/agents",
+    href: "/admin/agents",
     icon: Bot,
     title: "Agent 配置",
     desc: "自定义 Supervisor、产品经理、架构师等 Agent",
     color: "emerald",
   },
   {
-    href: "/settings/keys",
+    href: "/admin/keys",
     icon: KeyRound,
     title: "API 密钥",
     desc: "生成和管理平台 API Key（暂未启用）",
     color: "amber",
   },
   {
-    href: "/settings/system",
+    href: "/admin/system",
     icon: Database,
     title: "系统信息",
     desc: "数据库、Redis、存储状态",
     color: "rose",
   },
   {
-    href: "/settings/security",
+    href: "/admin/security",
     icon: Shield,
     title: "安全设置",
     desc: "加密密钥、访问控制（暂未启用）",
