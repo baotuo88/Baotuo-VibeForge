@@ -83,6 +83,15 @@ pnpm dev
 
 ## 生产部署
 
+> ⚠️ **两个 compose 文件用途不同，别搞混：**
+>
+> | 文件 | 包含服务 | 用途 | 命令 |
+> |------|---------|------|------|
+> | `docker-compose.yml`（默认） | postgres + redis + minio，**不含应用** | 本地开发：只起基础设施，应用用 `pnpm dev` 单独跑 | `docker compose up -d` |
+> | `docker-compose.prod.yml` | **应用 + postgres + redis** | 生产：一条命令起全套 | `docker compose -f docker-compose.prod.yml up -d --build` |
+>
+> 所以 `docker compose up -d`（不带 `-f`）**只会起数据库/Redis，不会起应用**。完整部署必须带 `-f docker-compose.prod.yml`。
+
 ### 方式一：Docker Compose（一体化，推荐）
 
 ```bash
@@ -90,10 +99,13 @@ cp .env.example .env
 # 编辑 .env：务必设置强随机的 NEXTAUTH_SECRET 和 ENCRYPTION_KEY，
 # 并将 NEXTAUTH_URL 改为你的域名/公网地址
 
+# 注意：完整部署必须指定 -f docker-compose.prod.yml
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 应用容器启动时会自动应用数据库迁移（无迁移文件时回退 `prisma db push`）。访问 `http://<服务器IP>:3008`。
+
+首次部署后数据库为空，**没有预置管理员**：直接访问 `/register` 注册，第一个注册的用户会自动成为管理员。
 
 ### 方式二：Vercel + 托管数据库
 
