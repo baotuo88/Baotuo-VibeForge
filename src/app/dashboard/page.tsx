@@ -1,8 +1,18 @@
 import Link from "next/link"
 import { AppShell, PageHeader } from "@/components/app-shell"
+import { getCurrentUser } from "@/lib/session"
 import { Plus, Sparkles, Server, Bot, FolderKanban } from "lucide-react"
 
-const QUICK_LINKS = [
+interface QuickLink {
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  title: string
+  desc: string
+  color: string
+  adminOnly?: boolean
+}
+
+const QUICK_LINKS: QuickLink[] = [
   {
     href: "/projects/new",
     icon: Plus,
@@ -11,11 +21,19 @@ const QUICK_LINKS = [
     color: "sky",
   },
   {
+    href: "/projects",
+    icon: FolderKanban,
+    title: "查看项目列表",
+    desc: "回到你的项目工作区",
+    color: "amber",
+  },
+  {
     href: "/admin/providers",
     icon: Server,
     title: "配置 AI Provider",
     desc: "接入 OpenAI / Anthropic / 自定义 API",
     color: "indigo",
+    adminOnly: true,
   },
   {
     href: "/admin/agents",
@@ -23,13 +41,7 @@ const QUICK_LINKS = [
     title: "调整 Agent",
     desc: "编辑各阶段 Agent 的 System Prompt",
     color: "emerald",
-  },
-  {
-    href: "/projects",
-    icon: FolderKanban,
-    title: "查看项目列表",
-    desc: "回到你的项目工作区",
-    color: "amber",
+    adminOnly: true,
   },
 ]
 
@@ -40,7 +52,12 @@ const COLORS: Record<string, string> = {
   amber: "bg-amber-500/10 text-amber-400",
 }
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const user = await getCurrentUser()
+  const isAdmin = user?.role === "ADMIN"
+
+  const links = QUICK_LINKS.filter((item) => !item.adminOnly || isAdmin)
+
   return (
     <AppShell>
       <PageHeader
@@ -62,7 +79,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {QUICK_LINKS.map((item) => {
+            {links.map((item) => {
               const Icon = item.icon
               return (
                 <Link
@@ -88,15 +105,17 @@ export default function DashboardPage() {
             })}
           </div>
 
-          <div className="mt-8 p-5 bg-[#1E293B]/50 border border-slate-800 rounded-lg text-sm text-slate-400">
-            <div className="font-medium text-slate-300 mb-2">首次使用？</div>
-            <ol className="list-decimal list-inside space-y-1">
-              <li>先在 <Link href="/admin/providers" className="text-sky-400 hover:underline">AI Providers</Link> 添加至少一个 API Key</li>
-              <li>在 <Link href="/admin/models" className="text-sky-400 hover:underline">模型管理</Link> 拉取可用模型</li>
-              <li>在 <Link href="/admin/agents" className="text-sky-400 hover:underline">Agent 配置</Link> 给每个 Agent 绑定模型</li>
-              <li>回到工作台 <Link href="/projects/new" className="text-sky-400 hover:underline">创建项目</Link></li>
-            </ol>
-          </div>
+          {isAdmin && (
+            <div className="mt-8 p-5 bg-[#1E293B]/50 border border-slate-800 rounded-lg text-sm text-slate-400">
+              <div className="font-medium text-slate-300 mb-2">首次使用？</div>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>先在 <Link href="/admin/providers" className="text-sky-400 hover:underline">AI Providers</Link> 添加至少一个 API Key</li>
+                <li>在 <Link href="/admin/models" className="text-sky-400 hover:underline">模型管理</Link> 拉取可用模型</li>
+                <li>在 <Link href="/admin/agents" className="text-sky-400 hover:underline">Agent 配置</Link> 给每个 Agent 绑定模型</li>
+                <li>回到工作台 <Link href="/projects/new" className="text-sky-400 hover:underline">创建项目</Link></li>
+              </ol>
+            </div>
+          )}
         </div>
       </div>
     </AppShell>
