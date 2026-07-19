@@ -1,4 +1,4 @@
-import { StateGraph, END } from "@langchain/langgraph/web"
+import { StateGraph, START, END } from "@langchain/langgraph/web"
 import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages"
 import { llmService } from "@/lib/services/llm.service"
 import { AGENT_PROMPTS } from "./prompts"
@@ -56,11 +56,13 @@ class AgentOrchestrator {
     this.graph.addNode("database", this.databaseNode.bind(this))
     this.graph.addNode("prompt", this.promptNode.bind(this))
 
-    // Set entry point
-    this.graph.setEntryPoint("supervisor")
+    // Set entry point via START edge (setEntryPoint 只允许 "__start__" 字面量，
+    // 用 addEdge(START, ...) 是新版本 langgraph 的等价 API)
+    const g = this.graph as any
+    g.addEdge(START, "supervisor")
 
     // Add edges from supervisor to other agents
-    this.graph.addConditionalEdges(
+    g.addConditionalEdges(
       "supervisor",
       this.routeFromSupervisor.bind(this),
       {
@@ -73,10 +75,10 @@ class AgentOrchestrator {
     )
 
     // All agents return to supervisor
-    this.graph.addEdge("product_manager", "supervisor")
-    this.graph.addEdge("architect", "supervisor")
-    this.graph.addEdge("database", "supervisor")
-    this.graph.addEdge("prompt", "supervisor")
+    g.addEdge("product_manager", "supervisor")
+    g.addEdge("architect", "supervisor")
+    g.addEdge("database", "supervisor")
+    g.addEdge("prompt", "supervisor")
   }
 
   private async supervisorNode(state: AgentState): Promise<Partial<AgentState>> {
@@ -191,9 +193,23 @@ ${state.databaseDesign ? `\n参考数据库设计：\n${state.databaseDesign}` :
     return "END"
   }
 
-  async run(input: string): Promise<AgentState> {
+  /**
+   * 运行编排。
+   * @param input   本轮用户输入
+   * @param options.existing  已生成的产物（prd/架构/DB/prompts），注入后 supervisor 会跳过已完成阶段
+   * @param options.history   历史对话消息，作为上下文提供给各 Agent
+   */
+  async run(
+    input: string,
+    options?: {
+      existing?: Pick<AgentState, "prd" | "architecture" | "databaseDesign" | "prompts">
+      history?: AgentState["messages"]
+    }
+  ): Promise<AgentState> {
+    const history = options?.history ?? []
     const initialState: AgentState = {
-      messages: [{ role: "user", content: input }],
+      messages: [...history, { role: "user", content: input }],
+      ...options?.existing,
     }
 
     const compiled = this.graph.compile()

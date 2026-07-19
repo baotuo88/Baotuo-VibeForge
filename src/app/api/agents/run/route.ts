@@ -37,13 +37,29 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 加载已有产物与历史对话（多轮对话：让 supervisor 跳过已完成阶段，
+    // 各 Agent 获得上下文），仅在指定 projectId 时加载
+    let existing = undefined
+    let history: Awaited<ReturnType<typeof projectArtifactsService.loadConversationHistory>> = []
+    if (projectId) {
+      existing = await projectArtifactsService.loadExistingState(projectId)
+      history = await projectArtifactsService.loadConversationHistory(projectId)
+    }
+
     // 运行 Agent 编排
-    const result = await agentOrchestrator.run(message)
+    const result = await agentOrchestrator.run(message, { existing, history })
 
     // 持久化结果（仅当指定了 projectId）
+    // 只保存本轮新增的消息：跳过注入的历史部分
     let persisted = null
     if (projectId) {
-      persisted = await projectArtifactsService.persistRun(projectId, user.id, result)
+      const newMessages = result.messages.slice(history.length)
+      persisted = await projectArtifactsService.persistRun(
+        projectId,
+        user.id,
+        result,
+        newMessages
+      )
     }
 
     return NextResponse.json({
