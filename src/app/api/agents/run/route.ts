@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     let existing = undefined
     let history: Awaited<ReturnType<typeof projectArtifactsService.loadConversationHistory>> = []
     if (projectId) {
-      existing = await projectArtifactsService.loadExistingState(projectId)
+      existing = await projectArtifactsService.loadPriorState(projectId)
       history = await projectArtifactsService.loadConversationHistory(projectId)
     }
 
