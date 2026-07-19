@@ -35,6 +35,9 @@ RUN pnpm prisma generate
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 
+# 确保 public 目录存在（仓库可能没有该目录，避免 runner 阶段 COPY 失败）
+RUN mkdir -p /app/public
+
 # ---- 阶段 3: 运行 ----
 FROM node:20-alpine AS runner
 WORKDIR /app
@@ -52,14 +55,15 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Prisma schema、迁移文件与生成的 client（standalone 会带上 node_modules 里的 client，
-# 但迁移需要 schema 和 CLI，这里显式复制 schema、迁移目录、client 与 prisma CLI）
+# Prisma schema 与迁移文件（entrypoint 里 migrate deploy / db push 需要）
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-# prisma CLI 及其依赖，供 entrypoint 里 migrate deploy 使用（避免联网下载）
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+
+# 完整复制 builder 的 node_modules（保留 pnpm 软链结构与 .pnpm 目录）。
+# pnpm 的 node_modules 是软链到 .pnpm 的，单独复制某个包会丢失其传递依赖
+# （如 prisma CLI 依赖的 @prisma/engines）。整树复制可保证 standalone server、
+# 生成的 @prisma/client 与 prisma CLI（db push/migrate）的依赖全部可解析。
+# 放在 standalone COPY 之后，覆盖其精简版 node_modules。
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # 启动脚本：先跑迁移再启动
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./
