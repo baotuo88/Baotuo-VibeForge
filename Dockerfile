@@ -24,6 +24,9 @@ RUN if [ -f pnpm-lock.yaml ]; then \
 # ---- 阶段 2: 构建 ----
 FROM node:20-alpine AS builder
 WORKDIR /app
+# openssl + libc6-compat：Prisma 引擎在 Alpine 上依赖 libssl，缺失会退回错误的
+# openssl-1.1.x 引擎导致加载失败
+RUN apk add --no-cache libc6-compat openssl
 RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -41,6 +44,9 @@ RUN mkdir -p /app/public
 # ---- 阶段 3: 运行 ----
 FROM node:20-alpine AS runner
 WORKDIR /app
+
+# 运行时也需要 openssl/libc6-compat，否则 Prisma query engine 加载 libssl 失败
+RUN apk add --no-cache libc6-compat openssl
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
