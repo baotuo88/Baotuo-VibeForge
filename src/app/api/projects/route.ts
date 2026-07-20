@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireUser } from "@/lib/session"
+import { ConversationMode } from "@prisma/client"
+
+const CONVERSATION_MODES = Object.values(ConversationMode) as string[]
 
 // POST /api/projects - Create new project
 export async function POST(req: NextRequest) {
@@ -18,23 +21,35 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const project = await prisma.project.create({
-      data: {
-        name,
-        initialIdea,
-        userId: user.id,
-        status: "REQUIREMENT_ANALYSIS",
-      },
-    })
+    // 校验 mode 枚举，非法值返回 400 而非落到 catch 变成 500
+    if (!CONVERSATION_MODES.includes(mode)) {
+      return NextResponse.json(
+        { error: `无效的 mode，可选值：${CONVERSATION_MODES.join(", ")}` },
+        { status: 400 }
+      )
+    }
 
-    // Create initial conversation
-    await prisma.conversation.create({
-      data: {
-        projectId: project.id,
-        userId: user.id,
-        mode,
-        title: name,
-      },
+    // 项目与初始会话在同一事务内创建，避免出现「有项目无会话」的孤儿数据
+    const project = await prisma.$transaction(async (tx) => {
+      const p = await tx.project.create({
+        data: {
+          name,
+          initialIdea,
+          userId: user.id,
+          status: "REQUIREMENT_ANALYSIS",
+        },
+      })
+
+      await tx.conversation.create({
+        data: {
+          projectId: p.id,
+          userId: user.id,
+          mode: mode as ConversationMode,
+          title: name,
+        },
+      })
+
+      return p
     })
 
     return NextResponse.json(project)

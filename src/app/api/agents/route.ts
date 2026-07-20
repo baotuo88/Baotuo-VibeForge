@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
+import { Prisma, AgentType } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { requireUser, requireAdmin } from "@/lib/session"
+
+const AGENT_TYPES = Object.values(AgentType) as string[]
 
 // GET /api/agents - List all agents (any authenticated user)
 export async function GET(_req: NextRequest) {
@@ -46,6 +49,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // 校验 type 是合法枚举值，避免非法值触发 Prisma 500
+    if (!AGENT_TYPES.includes(type)) {
+      return NextResponse.json(
+        { error: `无效的 Agent 类型：${type}` },
+        { status: 400 }
+      )
+    }
+
     const agent = await prisma.agent.create({
       data: {
         name,
@@ -64,6 +75,26 @@ export async function POST(req: NextRequest) {
     })
     return NextResponse.json(agent)
   } catch (error) {
+    // type 唯一约束冲突：同类型 Agent 已存在
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return NextResponse.json(
+        { error: "该类型的 Agent 已存在，请直接编辑现有配置" },
+        { status: 409 }
+      )
+    }
+    // modelId 指向不存在的模型等外键错误
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2003"
+    ) {
+      return NextResponse.json(
+        { error: "指定的模型不存在" },
+        { status: 400 }
+      )
+    }
     console.error("Error creating agent:", error)
     return NextResponse.json(
       { error: "Failed to create agent" },

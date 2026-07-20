@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireUser } from "@/lib/session"
+import { ProjectStatus } from "@prisma/client"
+
+const PROJECT_STATUSES = Object.values(ProjectStatus) as string[]
 
 // GET /api/projects/[id] - Get project details
 export async function GET(

@@ -36,21 +36,36 @@ export class LLMService {
     }
 
     const provider = agent.model.provider
-    const apiKey = decrypt(provider.apiKey)
+
+    // 解密失败（密文损坏或 ENCRYPTION_KEY 变更）时给出明确的配置错误，
+    // 而非把底层 crypto 异常直接抛成 500
+    let apiKey: string
+    try {
+      apiKey = decrypt(provider.apiKey)
+    } catch {
+      throw new Error(
+        `Provider「${provider.name}」的 API Key 解密失败，可能是密钥损坏或 ENCRYPTION_KEY 已变更，请在后台重新填写`
+      )
+    }
 
     // Create appropriate chat model based on provider type
     switch (provider.type) {
+      case "CUSTOM":
+        // CUSTOM 必须显式配置 baseUrl，否则会静默走 OpenAI 默认地址
+        if (!provider.baseUrl) {
+          throw new Error(`自定义 Provider「${provider.name}」缺少 baseUrl 配置`)
+        }
+      // fallthrough
       case "OPENAI":
       case "DEEPSEEK":
       case "OPENROUTER":
-      case "CUSTOM":
         return new ChatOpenAI({
           openAIApiKey: apiKey,
           modelName: agent.model.name,
           temperature: agent.temperature,
           maxTokens: agent.maxTokens,
           configuration: {
-            baseURL: provider.baseUrl,
+            baseURL: provider.baseUrl ?? undefined,
           },
         })
 

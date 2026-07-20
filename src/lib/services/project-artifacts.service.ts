@@ -1,6 +1,29 @@
 import { prisma } from "@/lib/prisma"
+import { Prisma } from "@prisma/client"
 import type { AgentState } from "@/types/agent"
 import type { DocumentType, MessageRole } from "@prisma/client"
+
+/**
+ * 「查最新版本 → version+1 新建」在并发下会撞唯一约束（P2002）。
+ * 这里捕获唯一冲突并重试若干次，重试时会重新读取最新 version，
+ * 从而串行化并发写入，避免 500 或重复版本。
+ */
+async function withVersionRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn()
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2002" &&
+        attempt < retries
+      ) {
+        continue
+      }
+      throw e
+    }
+  }
+}
 
 /**
  * 将一次 Agent 编排的结果持久化到数据库：
@@ -55,22 +78,24 @@ export class ProjectArtifactsService {
     title: string,
     content: string
   ) {
-    const latest = await prisma.document.findFirst({
-      where: { projectId, type },
-      orderBy: { version: "desc" },
-    })
+    return withVersionRetry(async () => {
+      const latest = await prisma.document.findFirst({
+        where: { projectId, type },
+        orderBy: { version: "desc" },
+      })
 
-    // 内容未变化则跳过
-    if (latest && latest.content === content) return latest
+      // 内容未变化则跳过
+      if (latest && latest.content === content) return latest
 
-    return prisma.document.create({
-      data: {
-        projectId,
-        type,
-        title,
-        content,
-        version: latest ? latest.version + 1 : 1,
-      },
+      return prisma.document.create({
+        data: {
+          projectId,
+          type,
+          title,
+          content,
+          version: latest ? latest.version + 1 : 1,
+        },
+      })
     })
   }
 
@@ -131,22 +156,24 @@ export class ProjectArtifactsService {
       if (!content) continue
       const tool = (toolMap[key] || "CUSTOM") as any
 
-      const latest = await prisma.generatedPrompt.findFirst({
-        where: { projectId, tool },
-        orderBy: { version: "desc" },
-      })
-      if (latest && latest.content === content) continue
+      const p = await withVersionRetry(async () => {
+        const latest = await prisma.generatedPrompt.findFirst({
+          where: { projectId, tool },
+          orderBy: { version: "desc" },
+        })
+        if (latest && latest.content === content) return null
 
-      const p = await prisma.generatedPrompt.create({
-        data: {
-          projectId,
-          tool,
-          title: `${key} Prompt`,
-          content,
-          version: latest ? latest.version + 1 : 1,
-        },
+        return prisma.generatedPrompt.create({
+          data: {
+            projectId,
+            tool,
+            title: `${key} Prompt`,
+            content,
+            version: latest ? latest.version + 1 : 1,
+          },
+        })
       })
-      saved.push(p.id)
+      if (p) saved.push(p.id)
     }
     return saved
   }

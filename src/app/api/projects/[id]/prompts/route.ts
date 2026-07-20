@@ -1,8 +1,29 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { Prisma, DevelopmentTool } from "@prisma/client"
 import { generatePrompt } from "@/lib/prompts/templates"
-import { DevelopmentTool } from "@prisma/client"
 import { requireUser } from "@/lib/session"
+
+/**
+ * 「查最新版本 → version+1 新建」在并发下会撞唯一约束（P2002）。
+ * 捕获唯一冲突并重试，重试时重新读取最新 version，串行化并发写入。
+ */
+async function withVersionRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn()
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2002" &&
+        attempt < retries
+      ) {
+        continue
+      }
+      throw e
+    }
+  }
+}
 
 /**
  * 校验项目归属，返回 project 或 NextResponse 错误。
@@ -70,20 +91,22 @@ export async function POST(
       databaseDesign,
     })
 
-    // 版本递增保存
-    const latest = await prisma.generatedPrompt.findFirst({
-      where: { projectId: project.id, tool: tool as DevelopmentTool },
-      orderBy: { version: "desc" },
-    })
+    // 版本递增保存（并发下用唯一约束 + 重试串行化）
+    const prompt = await withVersionRetry(async () => {
+      const latest = await prisma.generatedPrompt.findFirst({
+        where: { projectId: project.id, tool: tool as DevelopmentTool },
+        orderBy: { version: "desc" },
+      })
 
-    const prompt = await prisma.generatedPrompt.create({
-      data: {
-        projectId: project.id,
-        tool: tool as DevelopmentTool,
-        title: `${tool} Prompt`,
-        content,
-        version: latest ? latest.version + 1 : 1,
-      },
+      return prisma.generatedPrompt.create({
+        data: {
+          projectId: project.id,
+          tool: tool as DevelopmentTool,
+          title: `${tool} Prompt`,
+          content,
+          version: latest ? latest.version + 1 : 1,
+        },
+      })
     })
 
     return NextResponse.json(prompt)

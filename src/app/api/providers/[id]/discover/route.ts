@@ -3,6 +3,9 @@ import { providerService } from "@/lib/services/provider.service"
 import { requireUser } from "@/lib/session"
 import { rateLimit, errorResponse } from "@/lib/api-utils"
 
+// 外部模型发现可能较慢，给足处理时间（fetch 自身已有 10s 超时兜底）
+export const maxDuration = 30
+
 // POST /api/providers/[id]/discover - Discover models (需登录 + 归属校验)
 export async function POST(
   _req: NextRequest,

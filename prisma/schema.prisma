@@ -200,7 +200,8 @@ model Agent {
   model            Model              @relation(fields: [modelId], references: [id])
   conversationLogs ConversationLog[]
 
-  @@index([type])
+  // Agent 为全局管理员配置，每种类型仅一条；getAgentConfig 依赖此约束保证选择确定性
+  @@unique([type])
   @@index([modelId])
   @@index([isActive])
   @@map("agents")
@@ -335,6 +336,8 @@ model Document {
   // Relations
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
+  // 版本唯一：防止并发「读最新版→建 version+1」产生重复 version
+  @@unique([projectId, type, version])
   @@index([projectId])
   @@index([type])
   @@map("documents")
@@ -375,6 +378,8 @@ model GeneratedPrompt {
   // Relations
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
+  // 版本唯一：防止并发「读最新版→建 version+1」产生重复 version
+  @@unique([projectId, tool, version])
   @@index([projectId])
   @@index([tool])
   @@map("generated_prompts")

@@ -36,9 +36,20 @@ export class ProviderService {
 
     if (!provider) return null
 
+    let apiKey: string
+    try {
+      apiKey = decrypt(provider.apiKey)
+    } catch {
+      // 密文损坏或 ENCRYPTION_KEY 变更导致解密失败：抛出明确的配置错误，
+      // 避免把底层加密异常直接冒泡成 500
+      throw new Error(
+        `Provider「${provider.name}」的 API Key 解密失败，请重新填写（可能是 ENCRYPTION_KEY 变更所致）`
+      )
+    }
+
     return {
       ...provider,
-      apiKey: decrypt(provider.apiKey),
+      apiKey,
     }
   }
 
@@ -158,10 +169,12 @@ export class ProviderService {
 
   private async discoverOpenAIModels(baseUrl: string, apiKey: string) {
     try {
+      // 加超时，避免上游 Provider 挂起导致请求长时间悬挂
       const response = await fetch(`${baseUrl}/models`, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
         },
+        signal: AbortSignal.timeout(15000),
       })
 
       if (!response.ok) {
@@ -171,6 +184,9 @@ export class ProviderService {
       const data = await response.json()
       return data.data || []
     } catch (error) {
+      if (error instanceof Error && error.name === "TimeoutError") {
+        throw new Error("获取模型列表超时，请检查 Provider 的 baseUrl 与网络")
+      }
       console.error("Error discovering models:", error)
       throw error
     }
