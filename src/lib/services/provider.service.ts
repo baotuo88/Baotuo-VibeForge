@@ -76,9 +76,18 @@ export class ProviderService {
       isActive?: boolean
     }
   ) {
-    const updateData: any = { ...data }
-
-    if (data.apiKey) {
+    // 显式白名单：只挑取允许更新的字段，避免调用方原始 body 透传
+    // （防止改写 userId/teamId 等归属字段或注入未预期字段）
+    const updateData: {
+      name?: string
+      baseUrl?: string
+      apiKey?: string
+      isActive?: boolean
+    } = {}
+    if (typeof data.name === "string") updateData.name = data.name
+    if (typeof data.baseUrl === "string") updateData.baseUrl = data.baseUrl
+    if (typeof data.isActive === "boolean") updateData.isActive = data.isActive
+    if (typeof data.apiKey === "string" && data.apiKey) {
       updateData.apiKey = encrypt(data.apiKey)
     }
 
@@ -186,7 +195,7 @@ export class ProviderService {
         supportsVision: true,
       },
       {
-        id: "claude-sonnet-3-5-20241022",
+        id: "claude-3-5-sonnet-20241022",
         name: "Claude 3.5 Sonnet",
         contextWindow: 200000,
         maxOutputTokens: 8192,

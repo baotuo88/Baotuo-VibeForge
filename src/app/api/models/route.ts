@@ -11,12 +11,14 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const providerId = searchParams.get("providerId")
 
-    // Only models from providers owned by user (or team-shared in future)
+    // 只返回当前用户拥有的 Provider 下的模型。
+    // 团队共享逻辑待团队功能实现后，再按当前用户所属 teamIds 精确匹配；
+    // 此前用 `teamId: { not: null }` 会匹配任意团队的 Provider，造成跨用户数据泄漏。
     const models = await prisma.model.findMany({
       where: {
         ...(providerId ? { providerId } : {}),
         provider: {
-          OR: [{ userId: user.id }, { teamId: { not: null } }],
+          userId: user.id,
         },
       },
       include: {

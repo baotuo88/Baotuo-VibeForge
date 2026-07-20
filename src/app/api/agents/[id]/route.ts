@@ -39,9 +39,28 @@ export async function PATCH(
     if (admin instanceof NextResponse) return admin
 
     const body = await req.json()
+
+    // 白名单：只允许更新这些字段，避免原始 body 透传（防止改写 id/关联/未预期字段）
+    const data: {
+      name?: string
+      description?: string
+      systemPrompt?: string
+      modelId?: string
+      temperature?: number
+      maxTokens?: number
+      isActive?: boolean
+    } = {}
+    if (typeof body.name === "string") data.name = body.name
+    if (typeof body.description === "string") data.description = body.description
+    if (typeof body.systemPrompt === "string") data.systemPrompt = body.systemPrompt
+    if (typeof body.modelId === "string") data.modelId = body.modelId
+    if (typeof body.temperature === "number") data.temperature = body.temperature
+    if (typeof body.maxTokens === "number") data.maxTokens = body.maxTokens
+    if (typeof body.isActive === "boolean") data.isActive = body.isActive
+
     const agent = await prisma.agent.update({
       where: { id: params.id },
-      data: body,
+      data,
       include: {
         model: {
           include: { provider: { select: { id: true, name: true, type: true } } },

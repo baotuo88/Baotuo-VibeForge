@@ -12,9 +12,28 @@ export async function PATCH(
 
   try {
     const body = await req.json()
+
+    // 白名单：只允许更新这些字段，避免原始 body 透传（防止改写 id/providerId 等）
+    const data: {
+      displayName?: string
+      contextWindow?: number | null
+      maxOutputTokens?: number | null
+      supportsFunctions?: boolean
+      supportsVision?: boolean
+      isActive?: boolean
+    } = {}
+    if (typeof body.displayName === "string") data.displayName = body.displayName
+    if (typeof body.contextWindow === "number" || body.contextWindow === null)
+      data.contextWindow = body.contextWindow
+    if (typeof body.maxOutputTokens === "number" || body.maxOutputTokens === null)
+      data.maxOutputTokens = body.maxOutputTokens
+    if (typeof body.supportsFunctions === "boolean") data.supportsFunctions = body.supportsFunctions
+    if (typeof body.supportsVision === "boolean") data.supportsVision = body.supportsVision
+    if (typeof body.isActive === "boolean") data.isActive = body.isActive
+
     const model = await prisma.model.update({
       where: { id: params.id },
-      data: body,
+      data,
     })
     return NextResponse.json(model)
   } catch (error) {
