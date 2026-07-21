@@ -29,12 +29,15 @@ export default function NewProjectPage() {
 
       const project = await projectRes.json()
 
-      // Redirect to chat
+      if (!projectRes.ok || !project?.id) {
+        throw new Error(project?.error || "创建项目失败")
+      }
+
+      // Redirect to chat（成功跳转后保持 loading，避免闪回按钮）
       router.push(`/projects/${project.id}`)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create project:", error)
-      alert("创建项目失败，请稍后重试")
-    } finally {
+      alert(error.message || "创建项目失败，请稍后重试")
       setLoading(false)
     }
   }
