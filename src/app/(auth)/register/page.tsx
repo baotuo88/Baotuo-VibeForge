@@ -43,11 +43,19 @@ export default function RegisterPage() {
       }
 
       // 自动登录
-      await signIn("credentials", {
+      const signInRes = await signIn("credentials", {
         email,
         password,
         redirect: false,
       })
+
+      // 注册成功但自动登录失败：不要跳 dashboard（会被中间件弹回），引导去登录页
+      if (signInRes?.error) {
+        setError("注册成功，但自动登录失败，请手动登录")
+        setLoading(false)
+        router.push("/login")
+        return
+      }
 
       router.push("/dashboard")
       router.refresh()
