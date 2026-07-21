@@ -59,6 +59,15 @@ const DOC_META: Record<string, { label: string; icon: any }> = {
   DATABASE: { label: "数据库设计", icon: Database },
 }
 
+// Agent 类型 → 中文进度标签，用于流式运行时展示当前工作的 Agent
+const AGENT_LABEL: Record<string, string> = {
+  SUPERVISOR: "调度中",
+  PRODUCT_MANAGER: "产品经理正在撰写 PRD",
+  ARCHITECT: "架构师正在设计技术架构",
+  DATABASE: "正在设计数据库",
+  PROMPT: "正在生成开发 Prompt",
+}
+
 type View = { kind: "chat" } | { kind: "doc"; type: string } | { kind: "prompts" }
 
 export default function ProjectChatPage() {
@@ -75,6 +84,7 @@ export default function ProjectChatPage() {
   const [copied, setCopied] = useState<string | null>(null)
   const [genTool, setGenTool] = useState("CLAUDE_CODE")
   const [generating, setGenerating] = useState(false)
+  const [activeAgent, setActiveAgent] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -119,35 +129,86 @@ export default function ProjectChatPage() {
 
     const userMessage: Message = { role: "user", content: input }
     setMessages((prev) => [...prev, userMessage])
+    const currentInput = input
     setInput("")
     setLoading(true)
+    setActiveAgent(null)
     setView({ kind: "chat" })
 
     try {
       const res = await fetch("/api/agents/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input, projectId }),
+        body: JSON.stringify({ message: currentInput, projectId }),
       })
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "运行失败")
-
-      if (data.result?.messages) {
-        setMessages((prev) => [
-          ...prev,
-          ...data.result.messages.filter((m: Message) => m.role === "assistant"),
-        ])
+      // 非流式错误（鉴权/限流/校验）会返回 JSON，先按状态码处理
+      if (!res.ok || !res.body) {
+        let errMsg = "运行失败"
+        try {
+          const data = await res.json()
+          errMsg = data.error || errMsg
+        } catch {
+          /* 忽略非 JSON 响应 */
+        }
+        throw new Error(errMsg)
       }
-      // 刷新生成的文档与项目状态
-      loadDocs()
-      loadPrompts()
-      loadProject()
+
+      // 读取 SSE 流：逐个 Agent 完成时更新进度与消息
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ""
+      let streamError: string | null = null
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+
+        // 按 SSE 事件分隔（\n\n）解析
+        const parts = buffer.split("\n\n")
+        buffer = parts.pop() ?? ""
+
+        for (const part of parts) {
+          const lines = part.split("\n")
+          const eventLine = lines.find((l) => l.startsWith("event: "))
+          const dataLine = lines.find((l) => l.startsWith("data: "))
+          if (!eventLine || !dataLine) continue
+
+          const event = eventLine.slice(7).trim()
+          let payload: any
+          try {
+            payload = JSON.parse(dataLine.slice(6))
+          } catch {
+            continue
+          }
+
+          if (event === "agent") {
+            setActiveAgent(payload.agent ?? null)
+            const msgs: Message[] = (payload.messages ?? []).filter(
+              (m: Message) => m.role === "assistant"
+            )
+            if (msgs.length) {
+              setMessages((prev) => [...prev, ...msgs])
+            }
+          } else if (event === "done") {
+            // 编排完成：刷新文档、Prompt、项目状态
+            loadDocs()
+            loadPrompts()
+            loadProject()
+          } else if (event === "error") {
+            streamError = payload.error || "编排运行失败"
+          }
+        }
+      }
+
+      if (streamError) throw new Error(streamError)
     } catch (error: any) {
       console.error("Failed to send message:", error)
       alert(error.message || "发送消息失败，请稍后重试")
     } finally {
       setLoading(false)
+      setActiveAgent(null)
     }
   }
 
@@ -301,6 +362,7 @@ export default function ProjectChatPage() {
           <ChatView
             messages={messages}
             loading={loading}
+            activeAgent={activeAgent}
             input={input}
             setInput={setInput}
             onSubmit={handleSubmit}
@@ -339,6 +401,7 @@ export default function ProjectChatPage() {
 function ChatView({
   messages,
   loading,
+  activeAgent,
   input,
   setInput,
   onSubmit,
@@ -400,7 +463,7 @@ function ChatView({
                 <Loader2 className="w-5 h-5 text-sky-400 animate-spin" />
               </div>
               <div className="bg-[#1E293B] border border-slate-700 rounded-lg px-4 py-3 text-slate-400">
-                AI 正在思考...
+                {activeAgent ? AGENT_LABEL[activeAgent] || `${activeAgent} 处理中...` : "AI 正在思考..."}
               </div>
             </div>
           )}

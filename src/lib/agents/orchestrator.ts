@@ -217,6 +217,80 @@ ${state.databaseDesign ? `\n参考数据库设计：\n${state.databaseDesign}` :
 
     return result
   }
+
+  /**
+   * 流式运行编排。每个节点（supervisor/PM/架构/数据库/Prompt）执行完成后，
+   * yield 一次该节点产出的状态增量，供上层推送 SSE 进度事件。
+   *
+   * 用法：
+   *   for await (const step of orchestrator.stream(input, opts)) {
+   *     // step = { agent: "PRODUCT_MANAGER", update: Partial<AgentState> }
+   *   }
+   * 迭代结束后可用 getStreamResult() 拿到累积的完整最终状态。
+   *
+   * @returns 异步迭代器，每步为 { agent, update }；agent 为触发本次增量的节点类型
+   */
+  async *stream(
+    input: string,
+    options?: {
+      existing?: Pick<AgentState, "prd" | "architecture" | "databaseDesign" | "prompts">
+      history?: AgentState["messages"]
+    }
+  ): AsyncGenerator<
+    { agent: AgentType; update: Partial<AgentState> },
+    AgentState,
+    unknown
+  > {
+    const history = options?.history ?? []
+    const initialState: AgentState = {
+      messages: [...history, { role: "user", content: input }],
+      ...options?.existing,
+    }
+
+    const compiled = this.graph.compile()
+
+    // LangGraph 的 stream() 每完成一个节点 yield 一个 { [nodeName]: partialState }。
+    // 节点名 → AgentType 映射，供前端展示。
+    const nodeToAgent: Record<string, AgentType> = {
+      supervisor: "SUPERVISOR",
+      product_manager: "PRODUCT_MANAGER",
+      architect: "ARCHITECT",
+      database: "DATABASE",
+      prompt: "PROMPT",
+    }
+
+    // 手动累积各通道最终值（stream 模式下不会自动返回聚合的终态）
+    const finalState: AgentState = { ...initialState }
+    const mergeMessages = (next?: AgentState["messages"]) => {
+      if (next && next.length) {
+        finalState.messages = [...(finalState.messages ?? []), ...next]
+      }
+    }
+
+    const stream = await (compiled as any).stream(initialState)
+    for await (const chunk of stream) {
+      // chunk 形如 { product_manager: { messages: [...], prd: "..." } }
+      for (const [nodeName, update] of Object.entries(chunk)) {
+        const agent = nodeToAgent[nodeName]
+        if (!agent) continue
+        const partial = update as Partial<AgentState>
+
+        // 累积到最终状态
+        mergeMessages(partial.messages)
+        if (partial.prd !== undefined) finalState.prd = partial.prd
+        if (partial.architecture !== undefined) finalState.architecture = partial.architecture
+        if (partial.databaseDesign !== undefined) finalState.databaseDesign = partial.databaseDesign
+        if (partial.prompts !== undefined) {
+          finalState.prompts = { ...(finalState.prompts ?? {}), ...partial.prompts }
+        }
+        if (partial.currentAgent !== undefined) finalState.currentAgent = partial.currentAgent
+
+        yield { agent, update: partial }
+      }
+    }
+
+    return finalState
+  }
 }
 
 export const agentOrchestrator = new AgentOrchestrator()

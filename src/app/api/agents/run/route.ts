@@ -46,26 +46,64 @@ export async function POST(req: NextRequest) {
       history = await projectArtifactsService.loadConversationHistory(projectId)
     }
 
-    // 运行 Agent 编排
-    const result = await agentOrchestrator.run(message, { existing, history })
+    // SSE 流式：每个 Agent 节点完成后推一个进度事件，最后推 done 事件（含完整结果）。
+    const encoder = new TextEncoder()
+    const historyLen = history.length
 
-    // 持久化结果（仅当指定了 projectId）
-    // 只保存本轮新增的消息：跳过注入的历史部分
-    let persisted = null
-    if (projectId) {
-      const newMessages = result.messages.slice(history.length)
-      persisted = await projectArtifactsService.persistRun(
-        projectId,
-        user.id,
-        result,
-        newMessages
-      )
-    }
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (event: string, data: unknown) => {
+          controller.enqueue(
+            encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+          )
+        }
 
-    return NextResponse.json({
-      success: true,
-      result,
-      persisted,
+        try {
+          const iterator = agentOrchestrator.stream(message, { existing, history })
+
+          // 手动迭代以捕获 generator 的 return 值（最终状态）
+          let step = await iterator.next()
+          while (!step.done) {
+            const { agent, update } = step.value
+            // 只把本轮助手消息推给前端展示
+            const newMessages = (update.messages ?? []).filter(
+              (m) => m.role === "assistant"
+            )
+            send("agent", { agent, messages: newMessages })
+            step = await iterator.next()
+          }
+
+          const result = step.value // AgentState 终态
+
+          // 持久化结果（仅当指定了 projectId）
+          let persisted = null
+          if (projectId) {
+            const newMessages = result.messages.slice(historyLen)
+            persisted = await projectArtifactsService.persistRun(
+              projectId,
+              user.id,
+              result,
+              newMessages
+            )
+          }
+
+          send("done", { success: true, result, persisted })
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "编排运行失败"
+          send("error", { error: message })
+        } finally {
+          controller.close()
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
     })
   } catch (error) {
     return errorResponse(error)
